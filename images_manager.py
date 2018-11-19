@@ -1,19 +1,30 @@
 import numpy as np
 
 
-class CameraImage:
-    def __init__(self, data, camera_matrix):
+class Camera:
+    def __init__(self, camera_matrix):
         assert len(camera_matrix.shape) == 2
         assert camera_matrix.shape[0] == 3
         assert camera_matrix.shape[1] == 4
 
-        self.data = data
         self.camera_matrix = camera_matrix
 
         # compute optical center
         m_inverse = np.linalg.inv(camera_matrix[0:3, 0:3])
         col_4 = camera_matrix[:, 3]
         self.optical_center = np.hstack((-m_inverse.dot(col_4), 1))
+
+
+class Image:
+    def __init__(self, data, camera=None):
+        self.data = data
+        self.camera = camera
+
+    def __getitem__(self, item):
+        return self.data[item]
+
+    def __setitem__(self, key, value):
+        self.data[key] = value
 
     def interpolate(self, y, x):
         """
@@ -35,8 +46,8 @@ class CameraImage:
 
 class ImagesManager:
     def __init__(self, images, matrices):
-        self.images = [CameraImage(images[i], matrices[i])
-                        for i in range(len(images))]
+        self.images = [Image(images[i], Camera(matrices[i]))
+                       for i in range(len(images))]
         self._fundamental_matrices = {}
 
     def image(self, index):
