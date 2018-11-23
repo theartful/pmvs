@@ -15,52 +15,34 @@ class Camera:
 
 
 class Feature:
-    def __init__(self, image_y, image_x, feature_type):
+    def __init__(self, image_y, image_x):
         self.y = image_y
         self.x = image_x
-        self.feature_type = feature_type
 
 
 class Cell:
-    def __init__(self, data):
-        self.data = data
-        self.features = []
+    def __init__(self):
         self.t_patches = []
         self.s_patches = []
         self.depth = 0
 
-    def __getitem__(self, item):
-        return self.data[item]
-
-    def __setitem__(self, key, value):
-        self.data[key] = value
-
 
 class Image:
-    def __init__(self, data, camera=None, cell_size=2):
+    def __init__(self, data, silhouette=None, camera=None, cell_size=2):
         self.data = data
+        self.silhouette = silhouette
         self.camera = camera
         self.cell_size = cell_size
         [height, width, _] = data.shape
-        x_cells = width // cell_size
-        y_cells = height // cell_size
-        self.cells = [[None] * x_cells] * y_cells
-
-    def _get_cell(self, i, j):
-        """
-        private method to create cell indexed(i, j)
-        :param i: index of the cell in the y axis
-        :param j: index of the cell in the x axis
-        :return: image cell(i, j)
-        """
-        y = i * self.cell_size
-        x = j * self.cell_size
-        return Cell(self.data[y: y + self.cell_size, x: x + self.cell_size],
-                    y, x)
+        self.x_cells = width // cell_size
+        self.y_cells = height // cell_size
+        self.cells = [[None] * self.x_cells for _ in range(self.y_cells)]
+        self.dog_features = []
+        self.harris_features = []
 
     def cell(self, i, j):
         if self.cells[i][j] is None:
-            self.cells[i][j] = self._get_cell(i, j)
+            self.cells[i][j] = Cell()
         return self.cells[i][j]
 
     def __getitem__(self, item):
@@ -88,8 +70,8 @@ class Image:
 
 
 class ImagesManager:
-    def __init__(self, images, matrices):
-        self.images = [Image(images[i], Camera(matrices[i]))
+    def __init__(self, images, silhouettes, matrices):
+        self.images = [Image(images[i], silhouettes[i], Camera(matrices[i]))
                        for i in range(len(images))]
         self._fundamental_matrices = {}
 
