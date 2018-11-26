@@ -15,9 +15,11 @@ class Camera:
 
 
 class Feature:
-    def __init__(self, image_y, image_x):
+    def __init__(self, image_y, image_x, feature_type, img=None):
         self.y = image_y
         self.x = image_x
+        self.feature_type = feature_type
+        self.img = img
 
 
 class Cell:
@@ -40,16 +42,33 @@ class Image:
         self.dog_features = []
         self.harris_features = []
 
-    def cell(self, i, j):
-        if self.cells[i][j] is None:
-            self.cells[i][j] = Cell()
-        return self.cells[i][j]
-
     def __getitem__(self, item):
         return self.data[item]
 
     def __setitem__(self, key, value):
         self.data[key] = value
+
+    def cell(self, i, j):
+        if self.cells[i][j] is None:
+            self.cells[i][j] = Cell()
+        return self.cells[i][j]
+
+    def add_feature(self, feat):
+        feat.img = self
+        if feat.feature_type == 'dog':
+            self.dog_features.append(feat)
+        elif feat.feature_type == 'harris':
+            self.harris_features.append(feat)
+
+    def camera_matrix(self):
+        if self.camera is None:
+            return None
+        return self.camera.camera_matrix
+
+    def optical_center(self):
+        if self.camera is None:
+            return None
+        return self.camera.optical_center
 
     def interpolate(self, y, x):
         """
@@ -93,10 +112,21 @@ class ImagesManager:
 
         camera_matrix_pinv = np.linalg.pinv(img1.camera_matrix())
         p_pdash = img2.camera_matrix().dot(camera_matrix_pinv)
-        fun_mat = np.cross(self.epipole(img1, img2), p_pdash)
+        fun_mat = self._skew_form(self.epipole(img1, img2)).dot(p_pdash)
         self._fundamental_matrices[(img1, img2)] = fun_mat
         self._fundamental_matrices[(img2, img1)] = fun_mat.T
         return fun_mat
+
+    @staticmethod
+    def _skew_form(e):
+        """
+        calculates [e]x such that: e cross_product v =  [e]x dot v
+        :param x: 3D vector
+        :return: skew matrix form for the cross product
+        """
+        return np.array([[0, -e[2], e[1]],
+                         [e[2], 0, -e[0]],
+                         [-e[1], e[0], 0]])
 
     def __getitem__(self, item):
         return self.images[item]
