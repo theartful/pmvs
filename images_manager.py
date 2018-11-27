@@ -12,6 +12,7 @@ class Camera:
         m_inverse = np.linalg.inv(camera_matrix[0:3, 0:3])
         col_4 = camera_matrix[:, 3]
         self.optical_center = np.hstack((-m_inverse.dot(col_4), 1))
+        self.pinv = np.linalg.pinv(self.camera_matrix)
 
 
 class Feature:
@@ -27,6 +28,16 @@ class Cell:
         self.t_patches = []
         self.s_patches = []
         self.depth = 0
+
+
+class Patch:
+    def __init__(self, r_image, cell=None, normal=None, center=None):
+        self.t_images = []
+        self.s_images = []
+        self.r_image = r_image
+        self.normal = normal
+        self.center = center
+        self.cell = cell
 
 
 class Image:
@@ -93,6 +104,7 @@ class ImagesManager:
         self.images = [Image(images[i], silhouettes[i], Camera(matrices[i]))
                        for i in range(len(images))]
         self._fundamental_matrices = {}
+        self.patches = []
 
     def image(self, index):
         return self.images[index]
@@ -110,7 +122,7 @@ class ImagesManager:
         if (img1, img2) in self._fundamental_matrices:
             return self._fundamental_matrices[(img1, img2)]
 
-        camera_matrix_pinv = np.linalg.pinv(img1.camera_matrix())
+        camera_matrix_pinv = img1.camera.pinv
         p_pdash = img2.camera_matrix().dot(camera_matrix_pinv)
         fun_mat = self._skew_form(self.epipole(img1, img2)).dot(p_pdash)
         self._fundamental_matrices[(img1, img2)] = fun_mat
