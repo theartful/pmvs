@@ -25,16 +25,33 @@ def match_epipolar_consistency(feature, img_manager, d=2):
     return consistent_features
 
 
-def update_patch_vectors(patch):
+def get_patch_vectors(patch):
+    """
+    calculates the vectors (right, up) on the patch plane in world space
+    so that moving along side one of them corresponds to moving a unit
+    in the same direction in the reference image. in other words,
+    the projections of (right, up) are (1, 0, 0) and (0, 1, 0) respectively
+    :return: right, up
+    """
     p = patch.r_image.camera_matrix()
 
-    m = np.vstack([p, patch.normal])
-    m_inverse = np.linalg.inv(m)
+    a = np.vstack([p, patch.normal])
+    a_inverse = np.linalg.inv(a)
 
-    right = m_inverse.dot(np.array([1, 0, 0, 0]))
-    up = m_inverse.dot(np.array([0, 1, 0, 0]))
+    right = a_inverse.dot(np.array([1, 0, 0, 0]))
+    up = a_inverse.dot(np.array([0, 1, 0, 0]))
 
     d = p.dot(patch.center)[2]
     return right * d, up * d
+
+
+def triangulate(feat1_coord, feat2_coord, proj1, proj2, fun_mat):
+    line = fun_mat.dot(feat1_coord)
+    line_perp = np.array([-line[0], line[1], line[0] * feat2_coord[0] -
+                          line[1] * feat2_coord[1]])
+    a = np.vstack([proj1, proj2.T.dot(line_perp)])
+    b = np.array([feat1_coord[0], feat1_coord[1], feat1_coord[2], 0])
+    return np.linalg.solve(a, b)
+
 
 

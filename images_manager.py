@@ -22,6 +22,9 @@ class Feature:
         self.feature_type = feature_type
         self.img = img
 
+    def coord(self):
+        return np.array([self.x, self.y, 1])
+
 
 class Cell:
     def __init__(self):
@@ -122,8 +125,7 @@ class ImagesManager:
         if (img1, img2) in self._fundamental_matrices:
             return self._fundamental_matrices[(img1, img2)]
 
-        camera_matrix_pinv = img1.camera.pinv
-        p_pdash = img2.camera_matrix().dot(camera_matrix_pinv)
+        p_pdash = img2.camera_matrix().dot(img1.camera.pinv)
         fun_mat = self._skew_form(self.epipole(img1, img2)).dot(p_pdash)
         self._fundamental_matrices[(img1, img2)] = fun_mat
         self._fundamental_matrices[(img2, img1)] = fun_mat.T
