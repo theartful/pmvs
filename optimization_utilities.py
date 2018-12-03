@@ -53,5 +53,50 @@ def triangulate(feat1_coord, feat2_coord, proj1, proj2, fun_mat):
     b = np.array([feat1_coord[0], feat1_coord[1], feat1_coord[2], 0])
     return np.linalg.solve(a, b)
 
+def correlation_coefficient(cell1, cell2):
+    """
+    calculates normlized cross correlation for two cells
+    @params: source and destination cells
+    @return: normlized cross correlation of (cell1,cell2)
+    """
+    product = np.mean((cell1 - cell1.mean()) * (cell2 - cell2.mean()))
+    stds = cell1.std() * cell2.std()
+    if stds == 0:
+        return 0
+    else:
+        product /= stds
+        return product
 
+def ncc(img,p,right,up):
+    """
+    takes source patch, traverse around cell center and project
+    each point on the destination image
+    accumaltes pixel values in auxiliary cell
+    and computes the ncc between the aux cell and the cell of the source patch
+    """
+    c = p.center
+    cell_size = img.cell_size
+    camera_matrix = img.camera_matrix()
+    step = (cell_size -1)/2
+    top_left =  c - (right  + up ) * step
+    source_cell = img.data[p.cell.y_intial:p.cell.y_intial+cell_size,p.cell.x_intial:p.cell.x_intial+cell_size]
+    p_cell = np.zeros((cell_size,cell_size,3))
+    for y in range(cell_size):
+        for x in range(cell_size):
+            current_pos = top_left + y * up + x * right
+            projected_cpos =  camera_matrix.dot(current_pos)
+            projected_cpos = projected_cpos / projected_cpos[-1]
+            p_rgb = img.interpolate(x=projected_cpos[0],y=projected_cpos[1])
+            p_cell[y][x] = p_rgb
+    return correlation_coefficient(source_cell,p_cell)
 
+def similarity_function(patch):
+    """
+    calculates accumlates ncc for source patch with t_images (truely visible images as said by essam)
+    """
+    right,up = get_patch_vectors(patch)
+    accumlative_ncc = 0
+    for img in patch.t_images:
+        accumlative_ncc = accumlative_ncc + ncc(img,patch,right,up)
+    accumlative_ncc = accumlative_ncc / len( patch.t_images)
+    return accumlative_ncc

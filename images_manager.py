@@ -27,10 +27,13 @@ class Feature:
 
 
 class Cell:
-    def __init__(self):
+    def __init__(self,x_init,y_init):
         self.t_patches = []
         self.s_patches = []
         self.depth = 0
+        self.x_intial = x_init
+        self.y_intial = y_init
+
 
 
 class Patch:
@@ -64,7 +67,7 @@ class Image:
 
     def cell(self, i, j):
         if self.cells[i][j] is None:
-            self.cells[i][j] = Cell()
+            self.cells[i][j] = Cell(x_init =j*self.cell_size,y_init = i * self.cell_size)
         return self.cells[i][j]
 
     def add_feature(self, feat):
@@ -154,4 +157,3 @@ class ImagesManager:
         :return: the projection of the optical center of image(i) in image(j)
         """
         return img2.camera_matrix().dot(img1.optical_center())
-
