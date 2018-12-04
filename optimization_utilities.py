@@ -47,8 +47,8 @@ def get_patch_vectors(patch):
 
 def triangulate(feat1_coord, feat2_coord, proj1, proj2, fun_mat):
     line = fun_mat.dot(feat1_coord)
-    line_perp = np.array([-line[0], line[1], line[0] * feat2_coord[0] -
-                          line[1] * feat2_coord[1]])
+    line_perp = np.array([-line[1], line[0], (line[1] * feat2_coord[0] -
+                          line[0] * feat2_coord[1]) / feat2_coord[2]])
     a = np.vstack([proj1, proj2.T.dot(line_perp)])
     b = np.array([feat1_coord[0], feat1_coord[1], feat1_coord[2], 0])
     return np.linalg.solve(a, b)
@@ -90,6 +90,7 @@ def ncc(img,p,right,up):
             p_cell[y][x] = p_rgb
     return correlation_coefficient(source_cell,p_cell)
 
+
 def similarity_function(patch):
     """
     calculates accumlates ncc for source patch with t_images (truely visible images as said by essam)
@@ -100,3 +101,39 @@ def similarity_function(patch):
         accumlative_ncc = accumlative_ncc + ncc(img,patch,right,up)
     accumlative_ncc = accumlative_ncc / len( patch.t_images)
     return accumlative_ncc
+
+def optimize_similarity(params, *args):
+    depth, alpha, beta = params
+    patch = args[0]
+    tmp = patch.center
+    tmp /= tmp[-1]
+    optical_center = patch.r_image.camera.optical_center
+    optical_center /= optical_center[-1]
+    unit_vector = (tmp - optical_center)
+    unit_vector /= np.linalg.norm(unit_vector)
+    center = optical_center + depth * unit_vector
+
+    normal = np.array([np.sin(alpha) * np.cos(beta), \
+                        np.sin(alpha) * np.sin(beta), \
+                        np.cos(alpha), 0])
+    patch.center = center
+    patch.normal = normal
+    return similarity_function(patch)
+
+def set_patch_t_images(patch, images, alpha):
+    right, up = get_patch_vectors(patch)
+    for img in images:
+        if(ncc(img,patch,right,up) >= alpha):
+            c = patch.center
+            camera_matrix = img.camera_matrix()
+            c_projected = camera_matrix.dot(c)
+            c_projected = c_projected / c_projected[-1]
+            is_in = img.silhouette[int(c_projected[1]), int(c_projected[0]) ]
+            print(is_in)
+            if is_in:
+                patch.t_images.append(img)
+
+
+def set_t_images(patches,images,alpha):
+    for p in patches:
+        set_patch_t_images(p,images,alpha)

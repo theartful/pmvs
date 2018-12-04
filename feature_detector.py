@@ -26,12 +26,15 @@ def detect_features(img, cell_size=32, features_per_cell=4):
 def _dog(img, sig1=1, sig2=np.sqrt(2)):
     gauss1 = gaussian(img.data, sigma=sig1, multichannel=True)
     gauss2 = gaussian(img.data, sigma=sig2, multichannel=True)
-    return rgb2gray(np.abs(gauss1 - gauss2) * (img.silhouette == 0))
+    tmp = np.abs(gauss1 - gauss2)
+    tmp[img.silhouette == 0] = 0
+    return rgb2gray(tmp)
 
 
 def _harris(img, k=0.06):
     harris = corner_harris(rgb2gray(img.data), k=k)
-    return harris * (img.silhouette[:, :, 0] == 0)
+    harris[img.silhouette == 0] = 0
+    return harris
 
 
 def _fill_features(img, feat_type, response_img, k, init_y, init_x, cell_size):

@@ -1,6 +1,6 @@
 import os.path
 import numpy as np
-from cv2 import imread
+from skimage.io import imread
 
 
 def load(path):
@@ -13,8 +13,9 @@ def load(path):
         img = imread("{path}/images/{index:04}.ppm".format
                      (path=path, index=index))
         silhouette = imread("{path}/silhouettes/{index:04}.pgm".format
-                      (path=path, index=index))
-        images.append(img * (silhouette == 0))
+                      (path=path, index=index)) == 0
+        img[silhouette == 0] = 0
+        images.append(img)
         silhouettes.append(silhouette)
         with open("{path}/calib/{index:04}.txt".format(path=path,
                                                        index=index)) as file:
