@@ -1,6 +1,6 @@
 from images_manager import *
 import numpy as np
-
+from scipy.optimize import fmin_cg
 
 def match_epipolar_consistency(feature, img_manager, d=2):
     consistent_features = []
@@ -102,7 +102,7 @@ def similarity_function(patch):
     accumlative_ncc = accumlative_ncc / len( patch.t_images)
     return accumlative_ncc
 
-def optimize_similarity(params, *args):
+def _optimize_similarity(params, *args):
     depth, alpha, beta = params
     patch = args[0]
     tmp = patch.center
@@ -120,6 +120,15 @@ def optimize_similarity(params, *args):
     patch.normal = normal
     return similarity_function(patch)
 
+def optimize_similarity(patch):
+    depth = patch.r_image.optical_center()- patch.center / patch.center[-1]
+    depth = np.linalg.norm(depth)
+    alpha = np.arccos(patch.normal[-2])
+    beta = np.arccos(patch.normal[1]/patch.normal[0])
+    params =  np.asarray((depth,alpha,beta))
+    fmin_cg(_optimize_similarity,params,args=(patch, ),\
+            disp=False, full_output=False)
+
 def set_patch_t_images(patch, images, alpha):
     right, up = get_patch_vectors(patch)
     for img in images:
@@ -129,7 +138,6 @@ def set_patch_t_images(patch, images, alpha):
             c_projected = camera_matrix.dot(c)
             c_projected = c_projected / c_projected[-1]
             is_in = img.silhouette[int(c_projected[1]), int(c_projected[0]) ]
-            print(is_in)
             if is_in:
                 patch.t_images.append(img)
 

@@ -46,5 +46,5 @@ def _fill_features(img, feat_type, response_img, k, init_y, init_x, cell_size):
         x = index % cell_size
         if response_cell[y, x] == 0:
             continue
-        feature = images_manager.Feature(y + init_y, x + init_x, feat_type)
+        feature = images_manager.Feature(y + init_y, x + init_x, feat_type,img)
         img.add_feature(feature)

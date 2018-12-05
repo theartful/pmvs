@@ -16,11 +16,14 @@ class Camera:
 
 
 class Feature:
-    def __init__(self, image_y, image_x, feature_type, img=None):
+    def __init__(self, image_y, image_x, feature_type, img):
         self.y = image_y
         self.x = image_x
         self.feature_type = feature_type
         self.img = img
+        j = self.x//self.img.cell_size
+        i = self.y//self.img.cell_size
+        self.cell = self.img.cell(j=j,i=i)
 
     def coord(self):
         return np.array([self.x, self.y, 1])
@@ -91,10 +94,19 @@ class Image:
         """
         perform bilinear interpolation to find the color at (y, x)
         """
+        if y >= self.data.shape[0] or y < 0:
+            return np.zeros([3, ])
+        if x >= self.data.shape[1] or x < 0:
+            return np.zeros([3, ])
+
         x1 = np.floor(x).astype(np.int)
-        x2 = x1 + 1
+        x2 = np.min([x1 + 1, self.data.shape[1] - 1])
         y1 = np.floor(y).astype(np.int)
-        y2 = y1 + 1
+        y2 = np.min([y1 + 1, self.data.shape[0] - 1])
+        if x2 == x1:
+            x1 -= 1
+        if y2 == y1:
+            y2 -= 1
 
         factor = 1.0 / ((x2 - x1) * (y2 - y1))
         v1 = np.array([x2 - x, x - x1])
