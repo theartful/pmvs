@@ -4,6 +4,7 @@ import numpy as np
 from images_manager import *
 from feature_detector import *
 from optimization_utilities import *
+import threading
 
 def perform_matching(images_manager):
     print("begin matching...")
@@ -14,10 +15,18 @@ def perform_matching(images_manager):
     print("begin feature matching...")
     i = 1
     for img in images_manager:
+        while( len( threading.enumerate()) >1):
+            time.sleep(3)
+            print("threading ",len( threading.enumerate()) )
         print("start img " + str(i))
         patches_num = len(images_manager.patches)
-        for feature in (img.dog_features + img.harris_features):
-            construct_patch(images_manager,feature)
+        #for feature in (img.dog_features + img.harris_features):
+            #construct_patch(images_manager,feature)
+        features =img.dog_features + img.harris_features
+        t1 = threading.Thread(target=process_threads, args=(features[0:400],images_manager,))
+        t1.start() 
+        t2= threading.Thread(target=process_threads, args=(features[400:],images_manager,))
+        t2.start() 
 
         patches_num = -patches_num + len(images_manager.patches)
         print("done img " + str(i) + " " + str(patches_num) + \
@@ -65,3 +74,9 @@ def _construct_candidate_patch(feat,c,images_manager,alpha=0.5):
      p.t_images = []
      optimization_utilities.set_patch_t_images(p,images_manager,alpha * 1.1)
      return p
+
+def process_threads(features,images_manager):
+     print("starting new thread")
+     for feature in (features):
+            construct_patch(images_manager,feature)
+               
