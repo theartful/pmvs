@@ -5,11 +5,7 @@ from images_manager import *
 from feature_detector import *
 from optimization_utilities import *
 import threading
-<<<<<<< HEAD
-
-=======
 import time
->>>>>>> 2cfee8a1c1c398ca89b4b5c5a4f84eebdbc6d987
 def perform_matching(images_manager):
     print("begin matching...")
     print("detecting features...")
@@ -19,24 +15,12 @@ def perform_matching(images_manager):
     print("begin feature matching...")
     i = 1
     for img in images_manager:
-        while( len( threading.enumerate()) >1):
-            time.sleep(3)
-            print("threading ",len( threading.enumerate()) )
+
         print("start img " + str(i))
         patches_num = len(images_manager.patches)
-<<<<<<< HEAD
-        #for feature in (img.dog_features + img.harris_features):
-            #construct_patch(images_manager,feature)
-        features =img.dog_features + img.harris_features
-        t1 = threading.Thread(target=process_threads, args=(features[0:400],images_manager,))
-        t1.start() 
-        t2= threading.Thread(target=process_threads, args=(features[400:],images_manager,))
-        t2.start() 
-=======
         features = img.dog_features + img.harris_features
         #for feature in (img.dog_features + img.harris_features):
             #construct_patch(images_manager,feature)
->>>>>>> 2cfee8a1c1c398ca89b4b5c5a4f84eebdbc6d987
 
         #patches_num = -patches_num + len(images_manager.patches)(
         t1 = threading.Thread(target=process_features,args=(features[:400],images_manager))
@@ -91,15 +75,7 @@ def _construct_candidate_patch(feat,c,images_manager,alpha=0.5):
      optimization_utilities.set_patch_t_images(p,images_manager,alpha * 1.1)
      return p
 
-<<<<<<< HEAD
-def process_threads(features,images_manager):
-     print("starting new thread")
-     for feature in (features):
-            construct_patch(images_manager,feature)
-               
-=======
 def process_features(features,images_manager):
     print("running new thread")
     for feature in features:
         construct_patch(images_manager,feature)
->>>>>>> 2cfee8a1c1c398ca89b4b5c5a4f84eebdbc6d987
