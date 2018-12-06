@@ -4,7 +4,8 @@ import numpy as np
 from images_manager import *
 from feature_detector import *
 from optimization_utilities import *
-
+import threading
+import time
 def perform_matching(images_manager):
     print("begin matching...")
     print("detecting features...")
@@ -16,13 +17,20 @@ def perform_matching(images_manager):
     for img in images_manager:
         print("start img " + str(i))
         patches_num = len(images_manager.patches)
-        for feature in (img.dog_features + img.harris_features):
-            construct_patch(images_manager,feature)
+        features = img.dog_features + img.harris_features
+        #for feature in (img.dog_features + img.harris_features):
+            #construct_patch(images_manager,feature)
 
-        patches_num = -patches_num + len(images_manager.patches)
+        #patches_num = -patches_num + len(images_manager.patches)(
+        t1 = threading.Thread(target=process_features,args=(features[:400],images_manager))
+        t2 = threading.Thread(target=process_features,args=(features[400:],images_manager))
+        t1.start()
+        t2.start()
         print("done img " + str(i) + " " + str(patches_num) + \
             " created succesfully!")
-
+    while(len(threading.enumerate())>1):
+        time.sleep(3)
+        print('waiting ..')
 
 def construct_patch(images_manager,feature,gamma=3   ):
     consistent_features =  optimization_utilities.match_epipolar_consistency(\
@@ -65,3 +73,8 @@ def _construct_candidate_patch(feat,c,images_manager,alpha=0.5):
      p.t_images = []
      optimization_utilities.set_patch_t_images(p,images_manager,alpha * 1.1)
      return p
+
+def process_features(features,images_manager):
+    print("running new thread")
+    for feature in features:
+        construct_patch(images_manager,feature)
