@@ -1,5 +1,5 @@
 import numpy as np
-
+import math
 
 class Camera:
     def __init__(self, camera_matrix):
@@ -33,7 +33,6 @@ class Cell:
         self.depth = 0
         self.x_intial = x_init
         self.y_intial = y_init
-
 
 
 class Patch:
@@ -91,18 +90,22 @@ class Image:
         """
         perform bilinear interpolation to find the color at (y, x)
         """
-        x1 = np.floor(x).astype(np.int)
+        if y < 0 or x < 0:
+            return np.zeros([3, ])
+        if y >= self.data.shape[0] or x >= self.data.shape[1]:
+            return np.zeros([3, ])
+
+        x1 = min(int(x), self.data.shape[1] - 2)
         x2 = x1 + 1
-        y1 = np.floor(y).astype(np.int)
+        y1 = min(int(y), self.data.shape[0] - 2)
         y2 = y1 + 1
 
-        factor = 1.0 / ((x2 - x1) * (y2 - y1))
         v1 = np.array([x2 - x, x - x1])
         v2 = np.array([self.data[y1, x1] * (y2 - y) +
                        self.data[y2, x1] * (y - y1),
                        self.data[y1, x2] * (y2 - y) +
                        self.data[y2, x2] * (y - y1)])
-        return factor * v1.dot(v2)
+        return v1.dot(v2)
 
 
 class ImagesManager:

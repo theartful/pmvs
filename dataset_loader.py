@@ -13,7 +13,7 @@ def load(path):
         img = imread("{path}/images/{index:04}.ppm".format
                      (path=path, index=index))
         silhouette = imread("{path}/silhouettes/{index:04}.pgm".format
-                      (path=path, index=index)) == 0
+                            (path=path, index=index)) == 0
         img[silhouette == 0] = 0
         images.append(img)
         silhouettes.append(silhouette)
