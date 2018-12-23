@@ -1,4 +1,8 @@
-/datasets
 datasets
 __pycache__
 .ipynb_checkpoints
+*.so
+*.h
+*.c
+*.ipynb
+build/
