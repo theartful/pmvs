@@ -12,8 +12,6 @@ from libc.math cimport acos
 from libc.math cimport atan2
 cimport cython
 
-ctypedef np.float_t DTYPE_t
- 
 
 cpdef list get_relevant_images(Image img, ImagesManager img_manager):
     cdef list relevant_images = []
@@ -270,21 +268,27 @@ cpdef bint visual_hull_check(double[:] center, ImagesManager images_manager):
     return True
 
 
-cpdef void set_patch_t_images(Patch patch, list images, double alpha):
+cpdef void set_patch_images(Patch patch, list images, double alpha_s, double alpha_t):
     cdef double[:] right
     cdef double[:] up
-    cdef list right_up
-    right_up = get_patch_vectors(patch)
-    right = right_up[0]
-    up = right_up[1]
-
+    right, up = get_patch_vectors(patch)
+    
     patch.t_images = [patch.r_image]
+    patch.s_images = [patch.r_image]    
+
     cdef double[:] depth_vector
     cdef Image img
+    cdef double ncc_score
+
     for img in images:
         depth_vector = vsub(img.optical_center(), patch.center)
         if vdot(depth_vector, patch.normal) <= 0:
             continue
-        if ncc(img, patch, right, up, patch.source_cell) >= alpha:
-            patch.t_images.append(img)
+        ncc_score = ncc(img, patch, right, up, patch.source_cell) 
+        if ncc_score >= alpha_s:
+            patch.s_images.append(img)
+            if ncc_score >= alpha_t:
+                patch.t_images.append(img)
+            else:
+                patch.f_images.append(img)
     

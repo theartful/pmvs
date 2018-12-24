@@ -40,7 +40,7 @@ cdef class Feature:
 cdef class Cell:
     def __cinit__(self, Image img, int x_init, int y_init):
         self.t_patches = []
-        self.s_patches = []
+        self.f_patches = []
         self.depth = 0
         self.x_initial = x_init
         self.y_initial = y_init
@@ -55,6 +55,7 @@ cdef class Patch:
     def __cinit__(self, Image r_image, Cell cell=None, double[:] normal=None, double[:] center=None):
         self.t_images = []
         self.s_images = []
+        self.f_images = []
         self.r_image = r_image
         self.normal = normal
         self.center = center

@@ -20,7 +20,7 @@ cdef class Feature:
 
 cdef class Cell:
     cdef public list t_patches
-    cdef public list s_patches
+    cdef public list f_patches
     cdef public int x_initial
     cdef public int y_initial
     cdef public double depth
@@ -30,6 +30,7 @@ cdef class Cell:
 cdef class Patch:
     cdef public list t_images
     cdef public list s_images
+    cdef public list f_images
     cdef public Image r_image
     cdef public double[:] normal
     cdef public double[:] center

@@ -83,7 +83,6 @@ cpdef double[:] cdot_nocp(double[:] vec, double c):
     return vec
 
 
-
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.cdivision(True)

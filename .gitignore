@@ -5,4 +5,5 @@ __pycache__
 *.h
 *.c
 *.ipynb
+*.ply
 build/

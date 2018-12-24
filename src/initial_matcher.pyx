@@ -11,13 +11,6 @@ from libc.math cimport abs
 from cpython.exc cimport PyErr_CheckSignals
 
 
-cdef int tot_optims = 0
-cdef int num_patches = 0
-cdef double tot_time = 0
-cdef double set_patch_time = 0
-cdef int num_set_patch_time = 0
-
-
 cdef void perform_matching(ImagesManager images_manager, bint detect_features=True):
     print("begin matching...")
     cdef list images = images_manager.images
@@ -39,19 +32,14 @@ cdef void perform_matching(ImagesManager images_manager, bint detect_features=Tr
         relevant_images = get_relevant_images(img, images_manager)
         features = img.dog_features + img.harris_features
         patches_num = len(images_manager.patches)
-        print("number of features: " + str(len(features)))
-        num = 0
         for feature in features:
-            num += 1
-            if num % 100 == 0:
-                print("finished " + str(num) + " features.")
             construct_patch(images_manager, relevant_images, feature)
             PyErr_CheckSignals()
-        print("done img " + str(i))
-        print(str(len(images_manager.patches) - patches_num) +
-              " patches created succesfully!")
-        print("current number of patches: " + str(len(images_manager.patches)))
         i += 1
+    print(str(len(images_manager.patches) - patches_num) +
+              " patches created succesfully!")
+    print("current number of patches: " + str(len(images_manager.patches)))
+        
 
 
 cdef void construct_patch(ImagesManager images_manager, list relevant_images, Feature feature):
@@ -102,40 +90,19 @@ cdef void construct_patch(ImagesManager images_manager, list relevant_images, Fe
 
     consistent_features.sort(key=feature_key)
 
-    global tot_optims
-    global num_patches
-    global tot_time
-    global num_set_patch_time
-    global set_patch_time
-
-    num_patches += 1
-
     cdef Feature c_f
     cdef double start_time
     cdef double elapsed_time
     for c_f in consistent_features:
         patch.center = feat_data[c_f][0]
-
-        num_set_patch_time += 1
-        start_time = time.time()
-        set_patch_t_images(patch, relevant_images, THRESHOLD1)
-        elapsed_time = (time.time() - start_time) * 1000
-        set_patch_time += elapsed_time
-
+        set_patch_images(patch, relevant_images, THRESHOLD1, THRESHOLD1)
+        
         if len(patch.t_images) <= 1:
             continue
 
-        tot_optims += 1
-        start_time = time.time()
         optimize_similarity(patch, images_manager)
-        elapsed_time = (time.time() - start_time) * 1000
-        tot_time += elapsed_time
 
-        num_set_patch_time += 1
-        start_time = time.time()
-        set_patch_t_images(patch, relevant_images, THRESHOLD2)
-        elapsed_time = (time.time() - start_time) * 1000
-        set_patch_time += elapsed_time
+        set_patch_images(patch, relevant_images, THRESHOLD1, THRESHOLD2)
 
         if len(patch.t_images) >= T_THRESHOLD:
             register_patch(patch)
@@ -145,11 +112,12 @@ cdef void construct_patch(ImagesManager images_manager, list relevant_images, Fe
 
 cdef void register_patch(Patch patch):
     cdef double[:] center = patch.center
-    cdef list t_images = patch.t_images
     cdef double[:] img_coord
     cdef Cell cell
     cdef Image img
-    for img in t_images:
+
+    # UGLY! needs to be refactored
+    for img in patch.t_images:
         img_coord = matvmul(img.camera_matrix(), center)
         img_coord = cdot(img_coord, 1/img_coord[2])
 
@@ -160,9 +128,25 @@ cdef void register_patch(Patch patch):
             continue
 
         cell = img.cell(
-            j=int(np.int(img_coord[0] / CELL_SIZE)),
-            i=int(np.int(img_coord[1] / CELL_SIZE))) 
+            j=int(int(img_coord[0] / CELL_SIZE)),
+            i=int(int(img_coord[1] / CELL_SIZE)))
         cell.t_patches.append(patch)
+
+    for img in patch.f_images:
+        img_coord = matvmul(img.camera_matrix(), center)
+        img_coord = cdot(img_coord, 1/img_coord[2])
+
+        if img_coord[0] < 0 or img_coord[1] < 0:
+            continue
+        if img_coord[0] >= img.data.shape[1] or \
+                img_coord[1] >= img.data.shape[0]:
+            continue
+
+        cell = img.cell(
+            j=int(int(img_coord[0] / CELL_SIZE)),
+            i=int(int(img_coord[1] / CELL_SIZE)))
+        cell.f_patches.append(patch)
+
 
 
 cdef Patch _init_patch(Feature feat):
@@ -233,13 +217,3 @@ cpdef main(ImagesManager manager):
                    str(p.normal[0]) + " " + str(p.normal[1]) + " " + str(
             p.normal[2]) + '\n')
     file.close()
-
-    print("num tried patches: " + str(num_patches))
-    print("num optimizations: " + str(tot_optims))
-    print("average time: " + str(tot_time / (tot_optims+0.0001)))
-    print("average iter: " + str(float(tot_optims) / (num_patches + 0.0001)))
-    print("num set_patch_time: " + str(num_set_patch_time))
-    print("set_patch_time time: " + str(set_patch_time))
-    print("average set_patch_time time: " + str(set_patch_time /
-                                                (num_set_patch_time+0.0001)))
-

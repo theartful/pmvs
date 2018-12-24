@@ -19,7 +19,7 @@ cpdef double similarity_function(Patch patch)
 
 cpdef bint visual_hull_check(double[:] center, ImagesManager images_manager)
 
-cpdef void set_patch_t_images(Patch patch, list images, double alpha)
+cpdef void set_patch_images(Patch patch, list images, double alpha_s, double alpha_t)
 
 cdef void optimize_similarity(Patch patch, ImagesManager images_manager)
 
