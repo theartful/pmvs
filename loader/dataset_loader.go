@@ -20,6 +20,7 @@ import (
 var (
 	supportedExtensions = map[string]bool{
 		"jpeg": true,
+		"jpg":  true,
 		"png":  true,
 		"ppm":  true,
 		"pgm":  true,
@@ -31,7 +32,7 @@ var (
 
 // LoadDataset : Loads a dataset consisting of images, projection matrices, and
 // possibly masks. The images must be in "path/images", masks in "path/silhouettes",
-// and matrices in "path/calib". mats are in row-major
+// and matrices in "path/calib". each matrix in 'mats' is in row-major
 func LoadDataset(
 	path string,
 	ext string,
@@ -52,8 +53,8 @@ func LoadDataset(
 		path += "/"
 	}
 
-	images = make([]image.Image, 0, 0)
-	silhouettes = make([]image.Image, 0, 0)
+	images = make([]image.Image, 0, 20)
+	silhouettes = make([]image.Image, 0, 20)
 
 	for i := 0; ; i++ {
 		imageData, _, errLoad := loadImage(
@@ -96,6 +97,7 @@ func loadProjMatrix(path string) (data []float64, err error) {
 	if err != nil {
 		return
 	}
+	defer reader.Close()
 	scanner := bufio.NewScanner(reader)
 	scanner.Split(bufio.ScanWords)
 	// read contour line
