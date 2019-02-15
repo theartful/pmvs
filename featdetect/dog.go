@@ -7,15 +7,13 @@ import (
 )
 
 const (
-	initialSigma    float64 = 1
-	sigmaStep       float64 = 1.4142135623730 // sqrt(2)
-	octaveSize      int     = 4
-	gridSize        int     = 32
-	featPerGridCell int     = 4
+	initialSigma float64 = 1
+	sigmaStep    float64 = 1.4142135623730 // sqrt(2)
+	octaveSize   int     = 4
 )
 
-// DetectFeatures : Detects features in image using SIFT like DoG detector
-func DetectFeatures(img *image.CHWImage, mask *image.CHWImage) []*Feature {
+// detectDogFeatures : Detects features in image using SIFT like DoG detector
+func detectDogFeatures(img *image.CHWImage, mask *image.CHWImage) []*Feature {
 	width := img.Width
 	height := img.Height
 	gridColsNum := int((width + gridSize - 1) / gridSize)
@@ -23,16 +21,18 @@ func DetectFeatures(img *image.CHWImage, mask *image.CHWImage) []*Feature {
 
 	octave := generateOctave(img)
 
-	featMap := make([]int, height*width, height*width)
-	featGrid := make([]FeatPriorityQueue, gridRowsNum*gridColsNum, gridRowsNum*gridColsNum)
+	featMap := make([]bool, height*width, height*width)
+	featGrid := make([]FeatPriorityQueue,
+		gridRowsNum*gridColsNum,
+		gridRowsNum*gridColsNum)
 
+	sigma := initialSigma
 	numOfFeatures := 0
-
 	for i := 1; i < octaveSize-1; i++ {
-		margin := int(math.Ceil(2 * initialSigma * math.Pow(sigmaStep, float64(i+2))))
+		margin := image.GaussianMargin(sigma)
 		for y := margin; y < height-margin; y++ {
 			for x := margin; x < width-margin; x++ {
-				if featMap[y*width+x] != 0 {
+				if mask.At(y, x, 0) == 0 || featMap[y*width+x] {
 					continue
 				}
 				if isLocalExtremum(octave, i, y, x) == 0 {
@@ -42,20 +42,17 @@ func DetectFeatures(img *image.CHWImage, mask *image.CHWImage) []*Feature {
 				gridX := int(x / gridSize)
 				response := octave[i].At(y, x, 0)
 				queue := &featGrid[gridY*gridColsNum+gridX]
-				if len(*queue) >= featPerGridCell {
-					if math.Abs(float64(response)) < math.Abs(float64((*queue)[0].Response)) {
-						continue
-					}
+				feature := NewFeature(x, y, math.Abs(float64(response)), DoG)
+				heap.Push(queue, feature)
+				numOfFeatures++
+				featMap[y*width+x] = true
+				if len(*queue) > featPerGridCell {
 					heap.Pop(queue)
 					numOfFeatures--
 				}
-				feature := NewFeature(x, y, float32(octave[i].At(y, x, 0)), DoG)
-
-				heap.Push(queue, feature)
-				numOfFeatures++
-				featMap[y*width+x] = 1
 			}
 		}
+		sigma *= sigmaStep
 	}
 
 	features := make([]*Feature, 0, numOfFeatures)

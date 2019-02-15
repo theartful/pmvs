@@ -1,7 +1,5 @@
 package featdetect
 
-import "math"
-
 // A FeatPriorityQueue implements heap.Interface and holds features.
 type FeatPriorityQueue []*Feature
 
@@ -25,8 +23,7 @@ func (pq *FeatPriorityQueue) Pop() interface{} {
 func (pq FeatPriorityQueue) Len() int { return len(pq) }
 
 func (pq FeatPriorityQueue) Less(i, j int) bool {
-	return math.Abs(float64(pq[i].Response)) <
-		math.Abs(float64(pq[j].Response))
+	return float64(pq[i].Response) < float64(pq[j].Response)
 }
 
 func (pq FeatPriorityQueue) Swap(i, j int) {

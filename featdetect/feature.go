@@ -14,12 +14,12 @@ const (
 type Feature struct {
 	X        int
 	Y        int
-	Response float32
+	Response float64
 	Type     FeatType
 }
 
 // NewFeature : Creates new feature with the given specifications
-func NewFeature(x, y int, response float32, featType FeatType) *Feature {
+func NewFeature(x, y int, response float64, featType FeatType) *Feature {
 	feat := new(Feature)
 	feat.X, feat.Y, feat.Response, feat.Type = x, y, response, featType
 	return feat
