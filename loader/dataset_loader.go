@@ -4,8 +4,9 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"image"
+	goimage "image"
 	"os"
+	"pmvs/image"
 	"strconv"
 	"strings"
 
@@ -38,7 +39,7 @@ func LoadDataset(
 	ext string,
 	mask bool,
 	maskExt string,
-) (images, silhouettes []image.Image, mats [][]float64, err error) {
+) (images, silhouettes []*image.CHWImage, mats [][]float64, err error) {
 
 	if !supportedExtensions[ext] {
 		err = errNotSupportedExt
@@ -53,8 +54,8 @@ func LoadDataset(
 		path += "/"
 	}
 
-	images = make([]image.Image, 0, 20)
-	silhouettes = make([]image.Image, 0, 20)
+	images = make([]*image.CHWImage, 0, 20)
+	silhouettes = make([]*image.CHWImage, 0, 20)
 
 	for i := 0; ; i++ {
 		imageData, _, errLoad := loadImage(
@@ -62,14 +63,14 @@ func LoadDataset(
 		if errLoad != nil {
 			break
 		}
-		images = append(images, imageData)
+		images = append(images, To3HWImage(imageData))
 
 		imageData, _, err = loadImage(
 			fmt.Sprintf("%ssilhouettes/%04d.%s", path, i, maskExt))
 		if err != nil {
 			break
 		}
-		silhouettes = append(silhouettes, imageData)
+		silhouettes = append(silhouettes, To1HWImage(imageData))
 
 		var mat []float64
 		mat, err = loadProjMatrix(fmt.Sprintf("%scalib/%04d.%s", path, i, "txt"))
@@ -81,14 +82,14 @@ func LoadDataset(
 	return
 }
 
-func loadImage(path string) (imageData image.Image, imageType string, err error) {
+func loadImage(path string) (imageData goimage.Image, imageType string, err error) {
 	var imageFile *os.File
 	imageFile, err = os.Open(path)
 	if err != nil {
 		return
 	}
 	defer imageFile.Close()
-	imageData, imageType, err = image.Decode(imageFile)
+	imageData, imageType, err = goimage.Decode(imageFile)
 	return
 }
 
@@ -115,4 +116,30 @@ func loadProjMatrix(path string) (data []float64, err error) {
 		data = append(data, num)
 	}
 	return
+}
+
+func To3HWImage(img goimage.Image) *image.CHWImage {
+	height, width := img.Bounds().Dy(), img.Bounds().Dx()
+	chwImage := image.NewImage(height, width, 3)
+	for x := 0; x < width; x++ {
+		for y := 0; y < height; y++ {
+			r, g, b, a := img.At(x, y).RGBA()
+			chwImage.Set(y, x, 0, float32(r)/float32(a))
+			chwImage.Set(y, x, 1, float32(g)/float32(a))
+			chwImage.Set(y, x, 2, float32(b)/float32(a))
+		}
+	}
+	return chwImage
+}
+
+func To1HWImage(img goimage.Image) *image.CHWImage {
+	height, width := img.Bounds().Dy(), img.Bounds().Dx()
+	chwImage := image.NewImage(height, width, 1)
+	for x := 0; x < width; x++ {
+		for y := 0; y < height; y++ {
+			r, _, _, a := img.At(x, y).RGBA()
+			chwImage.Set(y, x, 0, float32(r)/float32(a))
+		}
+	}
+	return chwImage
 }
