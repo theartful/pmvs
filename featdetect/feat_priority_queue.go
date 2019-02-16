@@ -23,7 +23,7 @@ func (pq *FeatPriorityQueue) Pop() interface{} {
 func (pq FeatPriorityQueue) Len() int { return len(pq) }
 
 func (pq FeatPriorityQueue) Less(i, j int) bool {
-	return float64(pq[i].Response) < float64(pq[j].Response)
+	return pq[i].Response < pq[j].Response
 }
 
 func (pq FeatPriorityQueue) Swap(i, j int) {

@@ -13,7 +13,7 @@ const (
 )
 
 // detectDogFeatures : Detects features in image using SIFT like DoG detector
-func detectDogFeatures(img *image.CHWImage, mask *image.CHWImage) []*Feature {
+func detectDogFeatures(img, mask *image.CHWImage) []*Feature {
 	width := img.Width
 	height := img.Height
 	gridColsNum := int((width + gridSize - 1) / gridSize)

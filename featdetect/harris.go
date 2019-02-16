@@ -10,7 +10,7 @@ const (
 	harrisSigma = 3
 )
 
-func detectHarrisFeatures(img *image.CHWImage, mask *image.CHWImage) []*Feature {
+func detectHarrisFeatures(img, mask *image.CHWImage) []*Feature {
 	responseMap := image.HarrisCorner(image.Grayscale(img), harrisSigma, k)
 
 	width := img.Width
@@ -26,7 +26,7 @@ func detectHarrisFeatures(img *image.CHWImage, mask *image.CHWImage) []*Feature 
 	for y := 0; y < height; y++ {
 		for x := 0; x < width; x++ {
 			response := responseMap.At(y, x, 0)
-			if response == 0 || mask.At(y, x, 0) == 0 {
+			if mask.At(y, x, 0) == 0 || response == 0 {
 				continue
 			}
 			gridY := int(y / gridSize)

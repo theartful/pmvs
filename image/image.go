@@ -1,6 +1,7 @@
 package image
 
-// CHWImage : A custom struct that represents an image as a continguous array of data
+// CHWImage : A custom struct that represents an image as a continguous array
+// of data in Channel-Height-Width layout
 type CHWImage struct {
 	Width   int
 	Height  int
@@ -18,6 +19,7 @@ func (image *CHWImage) Set(y, x, c int, val float32) {
 	image.Data[c*image.Width*image.Height+y*image.Width+x] = val
 }
 
+// Subtract : Performs the operation image = image - image2
 func (image *CHWImage) Subtract(image2 *CHWImage) *CHWImage {
 	length := len(image.Data)
 	for i := 0; i < length; i++ {
@@ -26,6 +28,7 @@ func (image *CHWImage) Subtract(image2 *CHWImage) *CHWImage {
 	return image
 }
 
+// Add : Performs the operation image = image + image2
 func (image *CHWImage) Add(image2 *CHWImage) *CHWImage {
 	length := len(image.Data)
 	for i := 0; i < length; i++ {
@@ -34,6 +37,7 @@ func (image *CHWImage) Add(image2 *CHWImage) *CHWImage {
 	return image
 }
 
+// Mul : Performs the operation image = image * image2
 func (image *CHWImage) Mul(image2 *CHWImage) *CHWImage {
 	length := len(image.Data)
 	for i := 0; i < length; i++ {
@@ -42,6 +46,7 @@ func (image *CHWImage) Mul(image2 *CHWImage) *CHWImage {
 	return image
 }
 
+// Subtract : Creates a new image equal to image - image2
 func Subtract(image, image2 *CHWImage) *CHWImage {
 	image3 := NewImage(image.Height, image.Width, image.Channel)
 	length := len(image.Data)
@@ -51,6 +56,7 @@ func Subtract(image, image2 *CHWImage) *CHWImage {
 	return image3
 }
 
+// Add : Creates a new image equal to image + image2
 func Add(image, image2 *CHWImage) *CHWImage {
 	image3 := NewImage(image.Height, image.Width, image.Channel)
 	length := len(image.Data)
@@ -60,6 +66,7 @@ func Add(image, image2 *CHWImage) *CHWImage {
 	return image3
 }
 
+// Mul : Creates a new image equal to image * image2
 func Mul(image, image2 *CHWImage) *CHWImage {
 	image3 := NewImage(image.Height, image.Width, image.Channel)
 	length := len(image.Data)
