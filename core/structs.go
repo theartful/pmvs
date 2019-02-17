@@ -34,9 +34,11 @@ type Camera struct {
 type Patch struct {
 	Normal *mat.VecDense
 	Center *mat.VecDense
+	RefImg int
 }
 
 // NewImagesManager : Creates new ImagesManager
+// Sets the global variable "imgsManager" with the newely created manager
 func NewImagesManager(imgs []*image.CHWImage, projMats [][]float64) *ImagesManager {
 	length := len(imgs)
 	if length != len(projMats) {
@@ -49,7 +51,7 @@ func NewImagesManager(imgs []*image.CHWImage, projMats [][]float64) *ImagesManag
 		photos[i] = newPhoto(imgs[i], projMats[i], i)
 	}
 
-	imgsManager := new(ImagesManager)
+	imgsManager = new(ImagesManager)
 	imgsManager.Photos, imgsManager.FundMats = photos, fundMats
 	return imgsManager
 }

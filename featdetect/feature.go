@@ -5,9 +5,11 @@ type FeatType int
 
 const (
 	// DoG : Difference of Gaussians feature type
-	DoG FeatType = 0
+	DoG FeatType = iota
 	// Harris : Harris feature type
-	Harris FeatType = 1
+	Harris FeatType = iota
+	// Count : Number of feature types
+	Count FeatType = iota
 )
 
 // Feature : Represents a detected feature in an image
