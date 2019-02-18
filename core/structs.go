@@ -17,6 +17,7 @@ type ImagesManager struct {
 // Photo : An image with its camera
 type Photo struct {
 	Img   *image.CHWImage
+	Mask  *image.CHWImage
 	Cam   *Camera
 	Feats [][]*featdetect.Feature
 	ID    int
@@ -32,14 +33,15 @@ type Camera struct {
 
 // Patch : A rectangle in 3D
 type Patch struct {
-	Normal *mat.VecDense
-	Center *mat.VecDense
-	RefImg int
+	Normal   *mat.VecDense
+	Center   *mat.VecDense
+	RefPhoto int
+	TPhotos  []int
 }
 
 // NewImagesManager : Creates new ImagesManager
 // Sets the global variable "imgsManager" with the newely created manager
-func NewImagesManager(imgs []*image.CHWImage, projMats [][]float64) *ImagesManager {
+func NewImagesManager(imgs, masks []*image.CHWImage, projMats [][]float64) *ImagesManager {
 	length := len(imgs)
 	if length != len(projMats) {
 		panic("Number of images and projection matrices aren't equal")
@@ -48,7 +50,7 @@ func NewImagesManager(imgs []*image.CHWImage, projMats [][]float64) *ImagesManag
 	fundMats := make([][]*mat.Dense, length, length)
 	for i := 0; i < length; i++ {
 		fundMats[i] = make([]*mat.Dense, length, length)
-		photos[i] = newPhoto(imgs[i], projMats[i], i)
+		photos[i] = newPhoto(imgs[i], masks[i], projMats[i], i)
 	}
 
 	imgsManager = new(ImagesManager)
@@ -56,11 +58,11 @@ func NewImagesManager(imgs []*image.CHWImage, projMats [][]float64) *ImagesManag
 	return imgsManager
 }
 
-func newPhoto(img *image.CHWImage, projMat []float64, id int) *Photo {
+func newPhoto(img, mask *image.CHWImage, projMat []float64, id int) *Photo {
 	photo := new(Photo)
-	photo.Img = img
-	photo.Cam = newCamera(projMat)
+	photo.Img, photo.Mask = img, mask
 	photo.ID = id
+	photo.Cam = newCamera(projMat)
 	return photo
 }
 
@@ -149,6 +151,29 @@ func (photo *Photo) OpticalAxis() *mat.VecDense {
 	c := mat.NewVecDense(4, nil)
 	c.CloneVec(photo.Cam.OpticalAxis)
 	return c
+}
+
+func (photo *Photo) At(y, x float64) (r, g, b float32) {
+	xint := int(x + 0.5)
+	yint := int(y + 0.5)
+	if xint < 0 || yint < 0 || xint >= photo.Img.Width ||
+		yint >= photo.Img.Height {
+		return 0, 0, 0
+	}
+	return photo.Img.At(yint, xint, 0), photo.Img.At(yint, xint, 1),
+		photo.Img.At(yint, xint, 2)
+}
+
+func (photo *Photo) IsMasked(y, x float64) bool {
+	xint := int(x + 0.5)
+	yint := int(y + 0.5)
+	// in this case the point lies outside the image bounadries
+	// can't say whether it's masked
+	if xint < 0 || yint < 0 || xint >= photo.Img.Width ||
+		yint >= photo.Img.Height {
+		return false
+	}
+	return photo.Mask.At(yint, xint, 0) == 0
 }
 
 func skewForm(vec *mat.VecDense) *mat.Dense {

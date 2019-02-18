@@ -75,10 +75,8 @@ func getRelevantImages(id int) []int {
 	return relevantImgs
 }
 
-func getPatchVectors(patch *Patch) (right, up *mat.VecDense) {
-	proj := imgsManager.Photos[patch.RefImg].CameraMatrix()
-	normal := patch.Normal
-	center := patch.Center
+func getPatchVectors(photo *Photo, center, normal *mat.VecDense) (right, up *mat.VecDense) {
+	proj := photo.CameraMatrix()
 	// there is probably a better way to do this
 	a := mat.NewDense(4, 4, []float64{
 		proj.At(0, 0), proj.At(0, 1), proj.At(0, 2), proj.At(0, 3),
@@ -107,6 +105,11 @@ func triangulate(x1, y1, x2, y2, id1, id2 int) *mat.VecDense {
 	proj1 := imgsManager.Photos[id1].CameraMatrix()
 	proj2 := imgsManager.Photos[id2].CameraMatrix()
 	funMat := imgsManager.FundamentalMatrix(id1, id2)
+	return _triangulate(x1, y1, x2, y2, proj1, proj2, funMat)
+}
+
+func _triangulate(x1, y1, x2, y2 int,
+	proj1, proj2, funMat *mat.Dense) *mat.VecDense {
 	x1float, y1float, x2float, y2float :=
 		float64(x1), float64(y1), float64(x2), float64(y2)
 
@@ -136,4 +139,110 @@ func triangulate(x1, y1, x2, y2, id1, id2 int) *mat.VecDense {
 	sol := mat.NewVecDense(4, nil)
 	sol.SolveVec(a, b)
 	return sol
+}
+
+func projectGrid(photo *Photo, center, right, up *mat.VecDense, gridSize int, result []float32) []float32 {
+	// project patch center on the photo
+	projMat := photo.CameraMatrix()
+	projCenter := mat.NewVecDense(3, nil)
+	projCenter.MulVec(projMat, center)
+
+	// project patch vectors on photo
+	projRight, projUp := mat.NewVecDense(3, nil), mat.NewVecDense(3, nil)
+	projRight.MulVec(projMat, right)
+	projUp.MulVec(projMat, up)
+	scale := 1.0 / projCenter.AtVec(2)
+	projRight.ScaleVec(scale, projRight)
+	projUp.ScaleVec(scale, projUp)
+	projCenter.ScaleVec(scale, projCenter)
+
+	step := float64(gridSize-1) / 2.0
+	diag := mat.NewVecDense(3, nil)
+	diag.AddVec(projRight, projUp)
+	diag.ScaleVec(step, diag)
+	topLeft := diag
+	topLeft.SubVec(projCenter, diag)
+
+	resIndex := 0
+	for i := 0; i < gridSize; i++ {
+		for j := 0; j < gridSize; j++ {
+			ifloat, jfloat := float64(i), float64(j)
+			x := topLeft.AtVec(0) + ifloat*projUp.AtVec(0) + jfloat*projRight.AtVec(0)
+			y := topLeft.AtVec(1) + ifloat*projUp.AtVec(1) + jfloat*projRight.AtVec(1)
+			result[resIndex], result[resIndex+1], result[resIndex+2] = photo.At(y, x)
+			resIndex += 3
+		}
+	}
+	return result
+}
+
+func patchNCCScore(photo *Photo, patch *Patch, right, up *mat.VecDense) float64 {
+	refPhoto := imgsManager.Photos[patch.RefPhoto]
+	cell1, cell2 := make([]float32, patchGridSize*patchGridSize*3), make([]float32, patchGridSize*patchGridSize*3)
+	cell1 = projectGrid(refPhoto, patch.Center, right, up, patchGridSize, cell1)
+	cell2 = projectGrid(photo, patch.Center, right, up, patchGridSize, cell2)
+	return ncc(cell1, cell2)
+}
+
+func ncc(cell1 []float32, cell2 []float32) float64 {
+	var mean1, mean2 float32
+	length := len(cell1)
+	for i := 0; i < length; i++ {
+		mean1 += cell1[i]
+		mean2 += cell2[i]
+	}
+	mean1 /= float32(length)
+	mean2 /= float32(length)
+
+	var std1, std2, product float32
+	for i := 0; i < length; i++ {
+		diff1 := cell1[i] - mean1
+		diff2 := cell2[i] - mean2
+		product += diff1 * diff2
+		std1 += diff1 * diff1
+		std2 += diff2 * diff2
+	}
+	stds := std1 * std2
+	if stds == 0 {
+		return 0
+	}
+	return float64(product) / math.Sqrt(float64(stds))
+}
+
+func visualHullCheck(point *mat.VecDense) bool {
+	projectedPoint := mat.NewVecDense(3, nil)
+	for _, photo := range imgsManager.Photos {
+		if photo.Mask == nil {
+			continue
+		}
+		projectedPoint.MulVec(photo.CameraMatrix(), point)
+		scale := projectedPoint.AtVec(2)
+		if scale == 0 {
+			continue
+		}
+		projectedPoint.ScaleVec(1.0/scale, projectedPoint)
+		if photo.IsMasked(projectedPoint.AtVec(1), projectedPoint.AtVec(0)) {
+			return false
+		}
+	}
+	return true
+}
+
+func constraintPhotos(patch *Patch, minNCC float64, searchIDs []int) []int {
+	right, up := getPatchVectors(imgsManager.Photos[patch.RefPhoto], patch.Center, patch.Normal)
+	result := make([]int, 0, 5)
+	depthVector := mat.NewVecDense(4, nil)
+
+	for _, photoID := range searchIDs {
+		photo := imgsManager.Photos[photoID]
+		depthVector.SubVec(photo.OpticalCenter(), patch.Center)
+		if mat.Dot(depthVector, patch.Normal) <= 0 {
+			continue
+		}
+		nccScore := patchNCCScore(photo, patch, right, up)
+		if nccScore >= minNCC {
+			result = append(result, photoID)
+		}
+	}
+	return result
 }
