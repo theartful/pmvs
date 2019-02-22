@@ -7,17 +7,6 @@ import (
 	"gonum.org/v1/gonum/mat"
 )
 
-var (
-	// used in getPatchVectors
-	// defined here instead of redefining it each time
-	bForPatchVecs = mat.NewDense(4, 2, []float64{
-		1, 0,
-		0, 1,
-		0, 0,
-		0, 0,
-	})
-)
-
 // getRelevantFeatures : Matches a feature with possible candidate features
 // this is done using the epipolar consistency metric
 func getRelevantFeatures(
@@ -76,26 +65,38 @@ func getRelevantImages(id int) []int {
 }
 
 func getPatchVectors(photo *Photo, center, normal *mat.VecDense) (right, up *mat.VecDense) {
-	proj := photo.CameraMatrix()
-	// there is probably a better way to do this
-	a := mat.NewDense(4, 4, []float64{
-		proj.At(0, 0), proj.At(0, 1), proj.At(0, 2), proj.At(0, 3),
-		proj.At(1, 0), proj.At(1, 1), proj.At(1, 2), proj.At(1, 3),
-		proj.At(2, 0), proj.At(2, 1), proj.At(2, 2), proj.At(2, 3),
-		normal.AtVec(0), normal.AtVec(1), normal.AtVec(2), normal.AtVec(3),
+	proj := photo.Cam.ProjMat
+	// right and up vectors are the first and second column of the
+	// pseudo inverse of the projection matrix
+	pinv := photo.Cam.Pinv
+
+	// subtract the normal component from right vector
+	// now right lies on the plane defined by normal
+	scale := pinv.At(0, 0)*normal.AtVec(0) +
+		pinv.At(1, 0)*normal.AtVec(1) +
+		pinv.At(2, 0)*normal.AtVec(2)
+	right = mat.NewVecDense(4, []float64{
+		pinv.At(0, 0) - scale*normal.AtVec(0),
+		pinv.At(1, 0) - scale*normal.AtVec(1),
+		pinv.At(2, 0) - scale*normal.AtVec(2),
+		0,
 	})
 
-	sol := mat.NewDense(4, 2, nil)
-	sol.Solve(a, bForPatchVecs)
-	// copy results
-	right = mat.NewVecDense(4, nil)
-	up = mat.NewVecDense(4, nil)
-	right.CloneVec(sol.ColView(0))
-	up.CloneVec(sol.ColView(1))
-	// scaling
-	d := mat.Dot(center, proj.RowView(2))
-	right.ScaleVec(d, right)
-	up.ScaleVec(d, up)
+	// subtract the normal component from up vector
+	// now up lies on the plane defined by normal
+	scale = pinv.At(0, 1)*normal.AtVec(0) +
+		pinv.At(1, 1)*normal.AtVec(1) +
+		pinv.At(2, 1)*normal.AtVec(2)
+	up = mat.NewVecDense(4, []float64{
+		pinv.At(0, 1) - scale*normal.AtVec(0),
+		pinv.At(1, 1) - scale*normal.AtVec(1),
+		pinv.At(2, 1) - scale*normal.AtVec(2),
+		0,
+	})
+
+	scale = mat.Dot(center, proj.RowView(2))
+	right.ScaleVec(scale/mat.Dot(proj.RowView(0), right), right)
+	up.ScaleVec(scale/mat.Dot(proj.RowView(1), up), up)
 	return
 }
 
@@ -108,8 +109,7 @@ func triangulate(x1, y1, x2, y2, id1, id2 int) *mat.VecDense {
 	return _triangulate(x1, y1, x2, y2, proj1, proj2, funMat)
 }
 
-func _triangulate(x1, y1, x2, y2 int,
-	proj1, proj2, funMat *mat.Dense) *mat.VecDense {
+func _triangulate(x1, y1, x2, y2 int, proj1, proj2, funMat *mat.Dense) *mat.VecDense {
 	x1float, y1float, x2float, y2float :=
 		float64(x1), float64(y1), float64(x2), float64(y2)
 
@@ -141,7 +141,9 @@ func _triangulate(x1, y1, x2, y2 int,
 	return sol
 }
 
-func projectGrid(photo *Photo, center, right, up *mat.VecDense, gridSize int, result []float32) []float32 {
+func projectGrid(photo *Photo, center, right, up *mat.VecDense,
+	gridSize int, result []float32) []float32 {
+
 	// project patch center on the photo
 	projMat := photo.CameraMatrix()
 	projCenter := mat.NewVecDense(3, nil)
@@ -178,7 +180,9 @@ func projectGrid(photo *Photo, center, right, up *mat.VecDense, gridSize int, re
 
 func patchNCCScore(photo *Photo, patch *Patch, right, up *mat.VecDense) float64 {
 	refPhoto := imgsManager.Photos[patch.RefPhoto]
-	cell1, cell2 := make([]float32, patchGridSize*patchGridSize*3), make([]float32, patchGridSize*patchGridSize*3)
+	cell1 := make([]float32, patchGridSize*patchGridSize*3)
+	cell2 := make([]float32, patchGridSize*patchGridSize*3)
+
 	cell1 = projectGrid(refPhoto, patch.Center, right, up, patchGridSize, cell1)
 	cell2 = projectGrid(photo, patch.Center, right, up, patchGridSize, cell2)
 	return ncc(cell1, cell2)
@@ -220,8 +224,8 @@ func visualHullCheck(point *mat.VecDense) bool {
 		if scale == 0 {
 			continue
 		}
-		projectedPoint.ScaleVec(1.0/scale, projectedPoint)
-		if photo.IsMasked(projectedPoint.AtVec(1), projectedPoint.AtVec(0)) {
+		if photo.IsMasked(projectedPoint.AtVec(1)/scale,
+			projectedPoint.AtVec(0)/scale) {
 			return false
 		}
 	}
@@ -229,7 +233,8 @@ func visualHullCheck(point *mat.VecDense) bool {
 }
 
 func constraintPhotos(patch *Patch, minNCC float64, searchIDs []int) []int {
-	right, up := getPatchVectors(imgsManager.Photos[patch.RefPhoto], patch.Center, patch.Normal)
+	refPhoto := imgsManager.Photos[patch.RefPhoto]
+	right, up := getPatchVectors(refPhoto, patch.Center, patch.Normal)
 	result := make([]int, 0, 5)
 	depthVector := mat.NewVecDense(4, nil)
 
