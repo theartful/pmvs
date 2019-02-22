@@ -25,6 +25,10 @@ func StartMatching() {
 }
 
 func constructPatch(photoID int, relevantImgs []int, feat *featdetect.Feature) int {
+	cell := getCell(photoID, feat.Y, feat.X)
+	if len(cell.Patches) != 0 {
+		return 0
+	}
 	type FeatSort struct {
 		feature  *featdetect.Feature
 		photoID  int
@@ -35,12 +39,15 @@ func constructPatch(photoID int, relevantImgs []int, feat *featdetect.Feature) i
 	opticalCenter := photo.OpticalCenter()
 	relevantFeats, ids := getRelevantFeatures(feat, photoID, relevantImgs)
 
-	relevantFeatData := make([]FeatSort, len(relevantFeats), len(relevantFeats))
-
-	featDataFiltered := make([]FeatSort, 0, len(relevantFeatData))
+	featDataFiltered := make([]FeatSort, 0, len(relevantFeats))
 
 	depthVector1, depthVector2 := mat.NewVecDense(4, nil), mat.NewVecDense(4, nil)
 	for feat2Id, feat2 := range relevantFeats {
+		cell = getCell(ids[feat2Id], feat2.Y, feat2.X)
+		if len(cell.Patches) != 0 {
+			continue
+		}
+
 		photo2 := imgsManager.Photos[ids[feat2Id]]
 		center := triangulate(feat.X, feat.Y, feat2.X, feat2.Y, photoID, ids[feat2Id])
 		center.ScaleVec(1/center.AtVec(3), center)
@@ -79,7 +86,7 @@ func constructPatch(photoID int, relevantImgs []int, feat *featdetect.Feature) i
 		optimizePatch(patch)
 		patch.TPhotos = constraintPhotos(patch, 0.7, relevantImgs)
 		if len(patch.TPhotos) >= 3 {
-			imgsManager.Patches = append(imgsManager.Patches, patch)
+			registerPatch(patch)
 			return 1
 		}
 	}

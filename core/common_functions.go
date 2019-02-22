@@ -246,3 +246,22 @@ func constraintPhotos(patch *Patch, minNCC float64, searchIDs []int) []int {
 	}
 	return result
 }
+
+func registerPatch(patch *Patch) {
+	photoCoord := mat.NewVecDense(3, nil)
+	for _, photoID := range patch.TPhotos {
+		photo := imgsManager.Photos[photoID]
+		photoCoord.MulVec(photo.CameraMatrix(), patch.Center)
+		x := int(photoCoord.AtVec(0)/photoCoord.AtVec(2)) / cellSize
+		y := int(photoCoord.AtVec(1)/photoCoord.AtVec(2)) / cellSize
+		cell := photo.Cells[y][x]
+		cell.Patches = append(cell.Patches, patch)
+	}
+	imgsManager.Patches = append(imgsManager.Patches, patch)
+}
+
+func getCell(photoID, y, x int) *Cell {
+	cellY := y / cellSize
+	cellX := x / cellSize
+	return imgsManager.Photos[photoID].Cells[cellY][cellX]
+}

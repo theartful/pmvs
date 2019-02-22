@@ -7,6 +7,14 @@ import (
 	"gonum.org/v1/gonum/mat"
 )
 
+var (
+	eye3 = mat.NewDense(3, 3, []float64{
+		1, 0, 0,
+		0, 1, 0,
+		0, 0, 1,
+	})
+)
+
 // ImagesManager : Container of input and output data
 type ImagesManager struct {
 	Photos   []*Photo
@@ -19,8 +27,14 @@ type Photo struct {
 	Img   *image.CHWImage
 	Mask  *image.CHWImage
 	Cam   *Camera
+	Cells [][]*Cell
 	Feats [][]*featdetect.Feature
 	ID    int
+}
+
+// Cell : Photos are divided into cells that contain patches
+type Cell struct {
+	Patches []*Patch
 }
 
 // Camera : Relevant camera information
@@ -28,7 +42,7 @@ type Camera struct {
 	ProjMat       *mat.Dense
 	OpticalAxis   *mat.VecDense
 	OpticalCenter *mat.VecDense
-	pinv          *mat.Dense
+	Pinv          *mat.Dense
 }
 
 // Patch : A rectangle in 3D
@@ -52,7 +66,6 @@ func NewImagesManager(imgs, masks []*image.CHWImage, projMats [][]float64) *Imag
 		fundMats[i] = make([]*mat.Dense, length, length)
 		photos[i] = newPhoto(imgs[i], masks[i], projMats[i], i)
 	}
-
 	imgsManager = new(ImagesManager)
 	imgsManager.Photos, imgsManager.FundMats = photos, fundMats
 	return imgsManager
@@ -63,6 +76,18 @@ func newPhoto(img, mask *image.CHWImage, projMat []float64, id int) *Photo {
 	photo.Img, photo.Mask = img, mask
 	photo.ID = id
 	photo.Cam = newCamera(projMat)
+	cellsWidth := (photo.Img.Width + cellSize - 1) / cellSize
+	cellsHeight := (photo.Img.Height + cellSize - 1) / cellSize
+	photo.Cells = make([][]*Cell, cellsHeight, cellsHeight)
+	for i := 0; i < cellsHeight; i++ {
+		photo.Cells[i] = make([]*Cell, cellsWidth, cellsWidth)
+		for j := 0; j < cellsWidth; j++ {
+			photo.Cells[i][j] = new(Cell)
+		}
+	}
+
+	photo.Cam.Pinv = mat.NewDense(4, 3, nil)
+	photo.Cam.Pinv.Solve(photo.Cam.ProjMat, eye3)
 	return photo
 }
 
@@ -73,14 +98,7 @@ func newCamera(projMatData []float64) *Camera {
 	projMat := mat.NewDense(3, 4, projMatData)
 
 	// compute optical center
-	// probably not the best way
-	mat3x3data := make([]float64, 9, 9)
-	for r := 0; r < 3; r++ {
-		for c := 0; c < 3; c++ {
-			mat3x3data[r*3+c] = projMat.At(r, c)
-		}
-	}
-	mat3x3 := mat.NewDense(3, 3, mat3x3data)
+	mat3x3 := projMat.Slice(0, 3, 0, 3)
 	opticalCenter := mat.NewVecDense(3, nil)
 	opticalCenter.SolveVec(mat3x3, projMat.ColView(3))
 	opticalCenter = mat.NewVecDense(4, []float64{
@@ -106,21 +124,11 @@ func (imgsManager *ImagesManager) FundamentalMatrix(id1, id2 int) *mat.Dense {
 	}
 	photo1 := imgsManager.Photos[id1]
 	photo2 := imgsManager.Photos[id2]
-	proj1 := photo1.Cam.ProjMat
 	proj2 := photo2.Cam.ProjMat
 	opticalCenter1 := photo1.Cam.OpticalCenter
 
-	if photo1.Cam.pinv == nil {
-		eye3 := mat.NewDense(3, 3, []float64{
-			1, 0, 0,
-			0, 1, 0,
-			0, 0, 1,
-		})
-		photo1.Cam.pinv = mat.NewDense(4, 3, nil)
-		photo1.Cam.pinv.Solve(proj1, eye3)
-	}
 	ppinv := mat.NewDense(3, 3, nil)
-	ppinv.Mul(proj2, photo1.Cam.pinv)
+	ppinv.Mul(proj2, photo1.Cam.Pinv)
 
 	epipole := mat.NewVecDense(3, nil)
 	epipole.MulVec(proj2, opticalCenter1)
@@ -132,27 +140,22 @@ func (imgsManager *ImagesManager) FundamentalMatrix(id1, id2 int) *mat.Dense {
 	return funMat
 }
 
-// CameraMatrix : Return a copy of the camera matrix
+// CameraMatrix : Return the camera matrix
 func (photo *Photo) CameraMatrix() *mat.Dense {
-	c := mat.NewDense(3, 4, nil)
-	c.Clone(photo.Cam.ProjMat)
-	return c
+	return photo.Cam.ProjMat
 }
 
-// OpticalCenter : Return a copy of the optical center
+// OpticalCenter : Return the optical center
 func (photo *Photo) OpticalCenter() *mat.VecDense {
-	c := mat.NewVecDense(4, nil)
-	c.CloneVec(photo.Cam.OpticalCenter)
-	return c
+	return photo.Cam.OpticalCenter
 }
 
-// OpticalAxis : Return a copy of the optical axis
+// OpticalAxis : Return the optical axis
 func (photo *Photo) OpticalAxis() *mat.VecDense {
-	c := mat.NewVecDense(4, nil)
-	c.CloneVec(photo.Cam.OpticalAxis)
-	return c
+	return photo.Cam.OpticalAxis
 }
 
+// At : Return the RGB color at (y, x)
 func (photo *Photo) At(y, x float64) (r, g, b float32) {
 	xint := int(x + 0.5)
 	yint := int(y + 0.5)
@@ -164,6 +167,7 @@ func (photo *Photo) At(y, x float64) (r, g, b float32) {
 		photo.Img.At(yint, xint, 2)
 }
 
+// IsMasked : Return whether (y, x) is masked or not
 func (photo *Photo) IsMasked(y, x float64) bool {
 	xint := int(x + 0.5)
 	yint := int(y + 0.5)
@@ -176,6 +180,7 @@ func (photo *Photo) IsMasked(y, x float64) bool {
 	return photo.Mask.At(yint, xint, 0) == 0
 }
 
+// skewForm : skewForm(v).dot(u) = v cross u
 func skewForm(vec *mat.VecDense) *mat.Dense {
 	return mat.NewDense(3, 3, []float64{
 		0, -vec.AtVec(2), vec.AtVec(1),

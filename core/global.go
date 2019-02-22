@@ -9,6 +9,7 @@ const (
 	cosMaxAngle   = 0.5                //math.Cos(60 * math.Pi / 180)
 	featMaxDist   = 2.0
 	patchGridSize = 5
+	cellSize      = 2
 )
 
 var (
